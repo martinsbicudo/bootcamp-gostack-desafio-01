@@ -1,109 +1,92 @@
-const express = require('express');
+const express = require("express");
+const app = express();
+const { parseIntId } = require("./middlewares");
 
-const server = express();
+app.use(express.json());
 
-server.use(express.json());
+let id = 0;
+let projects = [];
 
-/**
- * A variável `projects` pode ser `const` porque um `array`
- * pode receber adições ou exclusões mesmo sendo uma constante.
- */
-const projects = [];
-
-/**
- * Middleware que checa se o projeto existe
- */
-function checkProjectExists(req, res, next) {
-  const { id } = req.params;
-  const project = projects.find(p => p.id == id);
-
-  if (!project) {
-    return res.status(400).json({ error: 'Project not found' });
-  }
-
-  return next();
-}
-
-/**
- * Middleware que dá log no número de requisições
- */
-function logRequests(req, res, next) {
-
-  console.count("Número de requisições");
-
-  return next();
-}
-
-server.use(logRequests);
-
-/**
- * Retorna todos os projetos
- */
-server.get('/projects', (req, res) => {
-  return res.json(projects);
+app.get("/projects", (req, res) => {
+  res.json(projects);
 });
 
-/**
- * Request body: id, title
- * Cadastra um novo projeto
- */
-server.post('/projects', (req, res) => {
-  const { id, title } = req.body;
+app.get("/projects/:id", parseIntId, (req, res) => {
+  const { id } = req.params;
+  const project = projects.find(p => p.id === id);
 
-  const project = {
-    id,
-    title,
-    tasks: []
-  };
+  res.json(project);
+});
 
+app.post("/projects", (req, res) => {
+  const { title } = req.body;
+  const project = { id: ++id, title, tasks: [] };
   projects.push(project);
 
-  return res.json(project);
+  res.json(project);
 });
 
-/**
- * Route params: id
- * Request body: title
- * Altera o título do projeto com o id presente nos parâmetros da rota.
- */
-server.put('/projects/:id', checkProjectExists, (req, res) => {
+app.put("/projects/:id", parseIntId, (req, res) => {
   const { id } = req.params;
   const { title } = req.body;
+  projects = projects.map(p => {
+    if (p.id === id) {
+      p.title = title;
+    }
 
-  const project = projects.find(p => p.id == id);
+    return p;
+  });
+  const project = projects.find(p => p.id === id);
 
-  project.title = title;
-
-  return res.json(project);
+  res.json(project);
 });
 
-/**
- * Route params: id
- * Deleta o projeto associado ao id presente nos parâmetros da rota.
- */
-server.delete('/projects/:id', checkProjectExists, (req, res) => {
+app.delete("/projects/:id", parseIntId, (req, res) => {
   const { id } = req.params;
+  projects = projects.filter(p => p.id !== id);
 
-  const projectIndex = projects.findIndex(p => p.id == id);
-
-  projects.splice(projectIndex, 1);
-
-  return res.send();
+  res.send();
 });
 
-/**
- * Route params: id;
- * Adiciona uma nova tarefa no projeto escolhido via id; 
- */
-server.post('/projects/:id/tasks', checkProjectExists, (req, res) => {
+app.get("/projects/:id/tasks", parseIntId, (req, res) => {
+  const { id } = req.params;
+  const { tasks } = projects.find(p => p.id === id);
+
+  res.json(tasks);
+});
+
+app.post("/projects/:id/tasks", parseIntId, (req, res) => {
   const { id } = req.params;
   const { title } = req.body;
+  projects = projects.map(p => {
+    if (p.id === id) {
+      p.tasks.push(title);
+    }
 
-  const project = projects.find(p => p.id == id);
+    return p;
+  });
+  const { tasks } = projects.find(p => p.id === id);
 
-  project.tasks.push(title);
-
-  return res.json(project);
+  res.send(tasks);
 });
 
-server.listen(4000);
+app.delete("/projects/:id/tasks", parseIntId, (req, res) => {
+  const { id } = req.params;
+  const { title } = req.body;
+  projects = projects.map(p => {
+    if (p.id === id) {
+      p.tasks = p.tasks.filter(
+        t =>
+          JSON.stringify(t).toLowerCase() !==
+          JSON.stringify(title).toLowerCase()
+      );
+    }
+
+    return p;
+  });
+  const { tasks } = projects.find(p => p.id === id);
+
+  res.send(tasks);
+});
+
+app.listen(3000);
