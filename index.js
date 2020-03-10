@@ -8,7 +8,6 @@ const {
 
 let id = 0;
 let projects = [];
-let amountRequests = 0;
 
 function passProjectsForAllRoutes(req, res, next) {
   req.projects = projects;
@@ -16,7 +15,7 @@ function passProjectsForAllRoutes(req, res, next) {
 }
 
 function logAmountRequests(req, res, next) {
-  console.log(`${++amountRequests} requests made`);
+  console.count("Request count");
   next();
 }
 
