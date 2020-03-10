@@ -1,19 +1,44 @@
 const express = require("express");
 const app = express();
-const { parseIntId } = require("./middlewares");
-
-app.use(express.json());
+const {
+  parseIntId,
+  verifyProjectExist,
+  verifyTaskExist
+} = require("./middlewares");
 
 let id = 0;
 let projects = [];
+let amountRequests = 0;
+
+function passProjectsForAllRoutes(req, res, next) {
+  req.projects = projects;
+  next();
+}
+
+function logAmountRequests(req, res, next) {
+  console.log(`${++amountRequests} requests made`);
+  next();
+}
+
+function logTimeRequest(req, res, next) {
+  console.time("Request time");
+  next();
+  console.timeEnd("Request time");
+}
+
+app
+  .use(express.json())
+  .use(passProjectsForAllRoutes)
+  .use(logAmountRequests)
+  .use(logTimeRequest);
 
 app.get("/projects", (req, res) => {
-  res.json(projects);
+  res.json(req.projects);
 });
 
-app.get("/projects/:id", parseIntId, (req, res) => {
+app.get("/projects/:id", parseIntId, verifyProjectExist, (req, res) => {
   const { id } = req.params;
-  const project = projects.find(p => p.id === id);
+  const project = req.projects.find(p => p.id === id);
 
   res.json(project);
 });
@@ -26,10 +51,10 @@ app.post("/projects", (req, res) => {
   res.json(project);
 });
 
-app.put("/projects/:id", parseIntId, (req, res) => {
+app.put("/projects/:id", parseIntId, verifyProjectExist, (req, res) => {
   const { id } = req.params;
   const { title } = req.body;
-  projects = projects.map(p => {
+  projects = req.projects.map(p => {
     if (p.id === id) {
       p.title = title;
     }
@@ -41,52 +66,64 @@ app.put("/projects/:id", parseIntId, (req, res) => {
   res.json(project);
 });
 
-app.delete("/projects/:id", parseIntId, (req, res) => {
+app.delete("/projects/:id", parseIntId, verifyProjectExist, (req, res) => {
   const { id } = req.params;
-  projects = projects.filter(p => p.id !== id);
+  projects = req.projects.filter(p => p.id !== id);
 
   res.send();
 });
 
-app.get("/projects/:id/tasks", parseIntId, (req, res) => {
+app.get("/projects/:id/tasks", parseIntId, verifyProjectExist, (req, res) => {
   const { id } = req.params;
-  const { tasks } = projects.find(p => p.id === id);
+  const { tasks } = req.projects.find(p => p.id === id);
 
   res.json(tasks);
 });
 
-app.post("/projects/:id/tasks", parseIntId, (req, res) => {
-  const { id } = req.params;
-  const { title } = req.body;
-  projects = projects.map(p => {
-    if (p.id === id) {
-      p.tasks.push(title);
-    }
+app.post(
+  "/projects/:id/tasks",
+  parseIntId,
+  verifyProjectExist,
+  verifyTaskExist(),
+  (req, res) => {
+    const { id } = req.params;
+    const { title } = req.body;
+    projects = req.projects.map(p => {
+      if (p.id === id) {
+        p.tasks.push(title);
+      }
 
-    return p;
-  });
-  const { tasks } = projects.find(p => p.id === id);
+      return p;
+    });
+    const { tasks } = projects.find(p => p.id === id);
 
-  res.send(tasks);
-});
+    res.send(tasks);
+  }
+);
 
-app.delete("/projects/:id/tasks", parseIntId, (req, res) => {
-  const { id } = req.params;
-  const { title } = req.body;
-  projects = projects.map(p => {
-    if (p.id === id) {
-      p.tasks = p.tasks.filter(
-        t =>
-          JSON.stringify(t).toLowerCase() !==
-          JSON.stringify(title).toLowerCase()
-      );
-    }
+app.delete(
+  "/projects/:id/tasks",
+  parseIntId,
+  verifyProjectExist,
+  verifyTaskExist(false),
+  (req, res) => {
+    const { id } = req.params;
+    const { title } = req.body;
+    projects = req.projects.map(p => {
+      if (p.id === id) {
+        p.tasks = p.tasks.filter(
+          t =>
+            JSON.stringify(t).toLowerCase() !==
+            JSON.stringify(title).toLowerCase()
+        );
+      }
 
-    return p;
-  });
-  const { tasks } = projects.find(p => p.id === id);
+      return p;
+    });
+    const { tasks } = projects.find(p => p.id === id);
 
-  res.send(tasks);
-});
+    res.send(tasks);
+  }
+);
 
 app.listen(3000);
